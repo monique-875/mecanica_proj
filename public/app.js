@@ -1,126 +1,160 @@
 let token = localStorage.getItem("token");
-const $ = (id) => document.getElementById(id);
 
-async function api(path, options = {}) {
-  const response = await fetch(path, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
-    },
-  });
-  const data = await ressponse.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.mensagem || "Erro na requisição");
-  return data;
+function elemento(id) {
+  return document.getElementById(id);
 }
 
-function formObject(form) {
-  return Object.fromEntries(new FormData(form).entries());
-}
+async function api(caminho, metodo, dados) {
+  const configuracao = {
+    method: metodo || "GET",
+    headers: { "Content-Type": "application/json" }
+  };
 
-$("loginForm").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  try {
-    const data = await api("/login", {
-      method: "POST",
-      headers: {},
-      body: JSON.stringify({
-        email: $("email").value,
-        senha: $("senha").value,
-      }),
-    });
-    token = data.token;
-    localStorage.setItem("token", token);
-    mostrarApp();
-  } catch (error) {
-    $("loginErro").textContent = error.message;
+  if (token) configuracao.headers.Authorization = "Bearer " + token;
+  if (dados) configuracao.body = JSON.stringify(dados);
+
+  const resposta = await fetch(caminho, configuracao);
+  const resultado = await resposta.json().catch(function () { return {}; });
+
+  if (!resposta.ok) {
+    throw new Error(resultado.mensagem || "Erro na requisição");
   }
-});
-
-function mostrarApp() {
-  $("loginView").hidden = true;
-  $("appView").hidden = false;
-  carregarTudo();
+  return resultado;
 }
-if (token) mostrarApp();
-$("logout").onclick = () => {
+
+function dadosDoFormulario(formulario) {
+  const dados = {};
+  const campos = new FormData(formulario);
+  campos.forEach(function (valor, nome) { dados[nome] = valor; });
+  return dados;
+}
+
+elemento("loginForm").onsubmit = async function (evento) {
+  evento.preventDefault();
+
+  try {
+    const dados = await api("/login", "POST", {
+      email: elemento("email").value,
+      senha: elemento("senha").value
+    });
+    token = dados.token;
+    localStorage.setItem("token", token);
+    mostrarSistema();
+  } catch (erro) {
+    elemento("loginErro").textContent = erro.message;
+  }
+};
+
+function mostrarSistema() {
+  elemento("loginView").hidden = true;
+  elemento("appView").hidden = false;
+  carregarClientes();
+  carregarVeiculos();
+  carregarAgendamentos();
+}
+
+if (token) mostrarSistema();
+
+elemento("logout").onclick = function () {
   localStorage.removeItem("token");
   location.reload();
 };
-document.querySelectorAll("[data-tab]").forEach(
-  (b) =>
-    (b.onclick = () => {
-      document.querySelectorAll(".tab").forEach((t) => (t.hidden = true));
-      $(b.dataset.tab).hidden = false;
-    }),
-);
+
+const botoesAba = document.querySelectorAll("[data-tab]");
+botoesAba.forEach(function (botao) {
+  botao.onclick = function () {
+    const abas = document.querySelectorAll(".tab");
+    abas.forEach(function (aba) { aba.hidden = true; });
+    elemento(botao.dataset.tab).hidden = false;
+  };
+});
 
 async function carregarClientes() {
-  const busca = $("busca").value;
-  const rows = await api(
-    `/clientes${busca ? `?busca=${encodeURIComponent(busca)}` : ""}`,
-  );
-  $("clientesLista").innerHTML = rows
-    .map((c) => {
-      const cpf = typeof c.cpf === "string" ? c.cpf : "";
-      return `<div class="item"><span><b>${c.nome}</b><br>${cpf ? `${cpf} · ` : ""}${c.email || ""}</span></div>`;
-    })
-    .join("");
-}
-$("busca").oninput = carregarClientes;
-$("clienteForm").onsubmit = async (e) => {
-  e.preventDefault();
+  let caminho = "/clientes";
+  const busca = elemento("busca").value;
+  if (busca) caminho += "?busca=" + encodeURIComponent(busca);
+
   try {
-    await api("/clientes", {
-      method: "POST",
-      body: JSON.stringify(formObject(e.target)),
-    });
-    e.target.reset();
-    await carregarClientes();
+    const clientes = await api(caminho, "GET");
+    let html = "";
+
+    for (let i = 0; i < clientes.length; i++) {
+      const cliente = clientes[i];
+      const cpf = typeof cliente.cpf === "string" ? cliente.cpf : "";
+      html += '<div class="item"><span><b>' + cliente.nome + '</b><br>';
+      html += cpf ? cpf + " · " : "";
+      html += (cliente.email || "") + "</span></div>";
+    }
+    elemento("clientesLista").innerHTML = html;
   } catch (erro) {
     alert(erro.message);
   }
+}
+
+elemento("busca").oninput = carregarClientes;
+
+elemento("clienteForm").onsubmit = async function (evento) {
+  evento.preventDefault();
+  try {
+    await api("/clientes", "POST", dadosDoFormulario(evento.target));
+    evento.target.reset();
+    carregarClientes();
+  } catch (erro) { alert(erro.message); }
 };
 
 async function carregarVeiculos() {
-  const rows = await api("/veiculos");
-  $("veiculosLista").innerHTML = rows
-    .map(
-      (v) =>
-        `<div class="item"><span>${v.marca} ${v.modelo} (${v.placa}) · cliente ${v.id_cliente}</span></div>`,
-    )
-    .join("");
-}
-$("veiculoForm").onsubmit = async (e) => {
-  e.preventDefault();
   try {
-    const dados = formObject(e.target);
-    dados.ano = dados.ano ? Number(dados.ano) : null;
+    const veiculos = await api("/veiculos", "GET");
+    let html = "";
+
+    for (let i = 0; i < veiculos.length; i++) {
+      const veiculo = veiculos[i];
+      html += '<div class="item"><span>' + veiculo.marca + " " + veiculo.modelo;
+      html += " (" + veiculo.placa + ") · cliente " + veiculo.id_cliente + "</span></div>";
+    }
+    elemento("veiculosLista").innerHTML = html;
+  } catch (erro) { alert(erro.message); }
+}
+
+elemento("veiculoForm").onsubmit = async function (evento) {
+  evento.preventDefault();
+  try {
+    const dados = dadosDoFormulario(evento.target);
     dados.cliente_id = Number(dados.cliente_id);
-    await api("/veiculos", { method: "POST", body: JSON.stringify(dados) });
-    e.target.reset();
-    await carregarVeiculos();
-  } catch (erro) {
-    alert(erro.message);
-  }
+    dados.ano = Number(dados.ano) || null;
+    await api("/veiculos", "POST", dados);
+    evento.target.reset();
+    carregarVeiculos();
+  } catch (erro) { alert(erro.message); }
 };
 
 async function carregarAgendamentos() {
-  const rows = await api("/agendamentos");
-  $("agendamentosLista").innerHTML = rows
-    .map((a) => {
-      const data = new Date(a.data_agendamento);
-      const textoData = Number.isNaN(data.getTime())
-        ? String(a.data_agendamento || "")
-            .slice(0, 10)
-            .split("-")
-            .reverse()
-            .join("/")
-        : data.toLocaleDateString("pt-BR");
-      return `<div class="item"><span><b>${textoData}</b> · ${a.cliente_nome} · ${a.placa}<br>${a.descricao_servico || ""}</span></div>`;
-    })
-    .join("");
+  try {
+    const agendamentos = await api("/agendamentos", "GET");
+    let html = "";
+
+    for (let i = 0; i < agendamentos.length; i++) {
+      const agendamento = agendamentos[i];
+      const data = String(agendamento.data_agendamento || "").slice(0, 10);
+      const partes = data.split("-");
+      let textoData = data;
+      if (partes.length === 3) textoData = partes[2] + "/" + partes[1] + "/" + partes[0];
+
+      html += '<div class="item"><span><b>' + textoData + "</b> · ";
+      html += agendamento.cliente_nome + " · " + agendamento.placa + "<br>";
+      html += (agendamento.descricao_servico || "") + "</span></div>";
+    }
+    elemento("agendamentosLista").innerHTML = html;
+  } catch (erro) { alert(erro.message); }
 }
-$("agendamentoForm").onsubmit = async (e) => {
-  e.preventDefa
+
+elemento("agendamentoForm").onsubmit = async function (evento) {
+  evento.preventDefault();
+  try {
+    const dados = dadosDoFormulario(evento.target);
+    dados.veiculo_id = Number(dados.veiculo_id);
+    await api("/agendamentos", "POST", dados);
+    evento.target.reset();
+    carregarAgendamentos();
+  } catch (erro) { alert(erro.message); }
+};
