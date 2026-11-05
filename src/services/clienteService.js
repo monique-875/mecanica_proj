@@ -18,7 +18,7 @@ export async function criar(data) {
     throw error;
   }
   return create({
-    ...data,
+    ...data,// copia todas as propriedades de um objeto para dentro de outro.
     cpf_criptografado: data.cpf,
   });
 }
