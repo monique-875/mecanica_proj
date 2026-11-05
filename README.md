@@ -1,4 +1,3 @@
-# Oficina - API Node.js
 
 ## Configuração
 

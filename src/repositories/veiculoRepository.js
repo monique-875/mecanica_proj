@@ -10,22 +10,22 @@ export async function clienteExiste(id) {
   );
   return Boolean(rows.length);
 }
-export async function create(v) {
-  const [r] = await pool.query(
+export async function create(dadosVeiculo) {
+  const [resultado] = await pool.query(
     "INSERT INTO veiculo (id_cliente, placa, modelo, marca, ano) VALUES (?, ?, ?, ?, ?)",
-    [v.id_cliente || v.cliente_id, v.placa, v.modelo, v.marca, v.ano || null],
+    [dadosVeiculo.id_cliente || dadosVeiculo.cliente_id, dadosVeiculo.placa, dadosVeiculo.modelo, dadosVeiculo.marca, dadosVeiculo.ano || null],
   );
-  return r.insertId;
+  return resultado.insertId;
 }
-export async function update(id, v) {
+export async function update(id, dadosVeiculo) {
   await pool.query(
     "UPDATE veiculo SET id_cliente = ?, placa = ?, modelo = ?, marca = ?, ano = ? WHERE id_veiculo = ?",
     [
-      v.id_cliente || v.cliente_id,
-      v.placa,
-      v.modelo,
-      v.marca,
-      v.ano || null,
+      dadosVeiculo.id_cliente || dadosVeiculo.cliente_id,
+      dadosVeiculo.placa,
+      dadosVeiculo.modelo,
+      dadosVeiculo.marca,
+      dadosVeiculo.ano || null,
       id,
     ],
   );
